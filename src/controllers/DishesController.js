@@ -1,4 +1,5 @@
 const knex = require("../database/knex");
+const DiskStorage = require("../providers/DiskStorage");
 
 class DishesController {
   async create(request, response) {
@@ -18,16 +19,28 @@ class DishesController {
       price
     });
 
-    if (ingredients.length > 0) {
-      const ingredientsInsert = ingredients.map(ingredient => {
+    const hasOnlyOneIngredient = typeof(ingredients) === "string";
+
+    let ingredientsInsert
+    if (hasOnlyOneIngredient) {
+      ingredientsInsert = {
+        name: ingredients,
+        dish_id
+      }
+
+    } else if (ingredients.length > 1) {
+      ingredientsInsert = ingredients.map(ingredient => {
         return {
-          dish_id,
-          name : ingredient
+          name : ingredient,
+          dish_id
         }
       });
 
-      await knex("ingredients").insert(ingredientsInsert);
+    } else {
+      return 
     }
+
+    await knex("ingredients").insert(ingredientsInsert);
 
     return response.status(201).json();
   }
@@ -42,7 +55,7 @@ class DishesController {
 
     const dish = await knex("dishes").where({ id }).first();
 
-    if (book.image) {
+    if (dish.image) {
       await diskStorage.deleteFile(dish.image);
     }
 
@@ -57,8 +70,16 @@ class DishesController {
     await knex("dishes").where({ id }).update(dish);
     await knex("dishes").where({ id }).update('updated_at', knex.fn.now());
 
-    if (ingredients.length > 0) {
-      const ingredientsInsert = ingredients.map(ingredient => {
+    const hasOnlyOneIngredient = typeof(ingredients) === "string";
+
+    let ingredientsInsert
+    if (hasOnlyOneIngredient) {
+      ingredientsInsert = {
+        dish_id: dish.id,
+        name: ingredients
+      }
+    } else if (ingredients.length > 1) {
+      ingredientsInsert = ingredients.map(ingredient => {
         return {
           dish_id: dish.id,
           name : ingredient
@@ -84,6 +105,10 @@ class DishesController {
         .select([
           "dishes.id",
           "dishes.title",
+          "dishes.description",
+          "dishes.category",
+          "dishes.price",
+          "dishes.image",
         ])
         .whereLike("dishes.title", `%${title}%`)
         .whereIn("name", filterIngredients)
@@ -125,7 +150,7 @@ class DishesController {
 
     return response.status(200).json({
       ...dish,
-      ingredients
+      ingredients,
     });
   }
 }
